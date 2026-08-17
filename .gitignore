@@ -1,0 +1,16 @@
+# 依赖与缓存（可用 npm install 重新生成）
+node_modules/
+.npm-cache/
+
+# 构建与打包产物（可用 npm run build / electron-builder 重新生成）
+dist/
+release/
+
+# 临时文件与日志
+*.log
+*.tmp
+*.tmpdir
+
+# 系统文件
+.DS_Store
+Thumbs.db

@@ -1,0 +1,59 @@
+{
+  "name": "yixin-accounting",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "一新记账 - 本地记账桌面应用",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "electron": "electron .",
+    "dist": "npm run build && electron-builder",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@element-plus/icons-vue": "^2.3.2",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "echarts": "^6.1.0",
+    "electron": "^43.4.0",
+    "electron-builder": "^26.0.0",
+    "element-plus": "^2.14.4",
+    "vite": "^8.2.1",
+    "vue": "^3.5.41",
+    "vue-router": "^5.2.0"
+  },
+  "build": {
+    "appId": "com.yixin.accounting",
+    "productName": "一新记账",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "build/icon.png",
+      "category": "public.app-category.finance"
+    }
+  }
+}
