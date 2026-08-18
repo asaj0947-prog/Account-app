@@ -158,6 +158,35 @@ export async function removeSubcategory(l1Name, name) {
   }
 }
 
+// ---------- 数据导入导出 / 清空 ----------
+export async function exportCsv() {
+  if (!api) throw new Error('请在桌面软件中使用此功能')
+  return api.exportCsv()
+}
+
+export async function downloadTemplate() {
+  if (!api) throw new Error('请在桌面软件中使用此功能')
+  return api.downloadTemplate()
+}
+
+export async function importCsv() {
+  if (!api) throw new Error('请在桌面软件中使用此功能')
+  const summary = await api.importCsv()
+  if (summary && !summary.canceled && summary.imported > 0) {
+    const recs = await api.getRecords()
+    records.splice(0, records.length, ...recs)
+    sortRecords()
+  }
+  return summary
+}
+
+export async function clearData(scope) {
+  if (!api) throw new Error('请在桌面软件中使用此功能')
+  const summary = await api.clearData(scope)
+  records.splice(0, records.length)
+  return summary
+}
+
 // ---------- 记账弹窗状态 ----------
 export const ui = reactive({
   recordDialogVisible: false,

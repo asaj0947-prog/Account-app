@@ -1,5 +1,6 @@
-const { app, BrowserWindow, ipcMain } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog } = require('electron')
 const path = require('path')
+const fs = require('fs')
 const { DatabaseSync } = require('node:sqlite')
 
 let db = null
@@ -134,6 +135,121 @@ function removeRecord(id) {
   db.prepare('DELETE FROM records WHERE id = ?').run(id)
 }
 
+const { toCsv, parseCsv, decodeCsvBuffer, CSV_HEADER } = require('./csv.cjs')
+
+function recordsToCsvRows() {
+  return getAllRecords().map((r) => [
+    r.type === 'income' ? '收入' : '支出',
+    r.amount,
+    r.categoryL1,
+    r.categoryL2,
+    r.date,
+    r.note || ''
+  ])
+}
+
+function csvTimestamp() {
+  const d = new Date()
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`
+}
+
+function templateRows() {
+  return [
+    ['支出', 25.0, '餐饮饮食', '午餐', '2026-08-17', '（示例，导入前请删除）'],
+    ['收入', 8000.0, '工资薪酬', '工资', '2026-08-15', '（示例，导入前请删除）']
+  ]
+}
+
+async function exportCsv() {
+  const res = await dialog.showSaveDialog({
+    title: '导出账单',
+    defaultPath: `一新记账-账单-${csvTimestamp()}.csv`,
+    filters: [{ name: 'CSV 表格', extensions: ['csv'] }]
+  })
+  if (res.canceled || !res.filePath) return { canceled: true }
+  const rows = recordsToCsvRows()
+  const csv = '\uFEFF' + toCsv([CSV_HEADER, ...rows])
+  fs.writeFileSync(res.filePath, csv, 'utf8')
+  return { canceled: false, count: rows.length, filePath: res.filePath }
+}
+
+async function downloadTemplate() {
+  const res = await dialog.showSaveDialog({
+    title: '保存导入模板',
+    defaultPath: '一新记账-导入模板.csv',
+    filters: [{ name: 'CSV 表格', extensions: ['csv'] }]
+  })
+  if (res.canceled || !res.filePath) return { canceled: true }
+  const csv = '\uFEFF' + toCsv([CSV_HEADER, ...templateRows()])
+  fs.writeFileSync(res.filePath, csv, 'utf8')
+  return { canceled: false, filePath: res.filePath }
+}
+
+async function importCsv() {
+  const res = await dialog.showOpenDialog({
+    title: '导入账单',
+    filters: [{ name: 'CSV 表格', extensions: ['csv'] }],
+    properties: ['openFile']
+  })
+  if (res.canceled || !res.filePaths || res.filePaths.length === 0) return { canceled: true }
+  const filePath = res.filePaths[0]
+  const buf = fs.readFileSync(filePath)
+  const text = decodeCsvBuffer(buf)
+  const rows = parseCsv(text)
+  if (rows.length === 0) return { canceled: false, imported: 0, skipped: 0, errors: ['文件是空的，没有可导入的内容'], totalErrors: 1 }
+
+  let start = 0
+  const first = rows[0].map((x) => String(x).trim())
+  if (first[0] === '类型' || first[0].toLowerCase() === 'type') start = 1
+
+  const cats = getCategories()
+  const catIndex = {}
+  const subIndex = {}
+  for (const c of cats) {
+    catIndex[c.type + '|' + c.name] = true
+    for (const l2 of c.children) subIndex[c.type + '|' + c.name + '|' + l2] = true
+  }
+
+  let imported = 0
+  const errors = []
+  const insRec = db.prepare('INSERT INTO records (type, amount, categoryL1, categoryL2, date, note, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)')
+
+  rows.slice(start).forEach((r, idx) => {
+    const line = idx + start + 1
+    const typeRaw = String(r[0] == null ? '' : r[0]).trim()
+    const amountRaw = String(r[1] == null ? '' : r[1]).trim()
+    const l1 = String(r[2] == null ? '' : r[2]).trim()
+    const l2 = String(r[3] == null ? '' : r[3]).trim()
+    const date = String(r[4] == null ? '' : r[4]).trim()
+    const note = String(r[5] == null ? '' : r[5]).trim()
+
+    if (!typeRaw && !amountRaw && !l1 && !l2 && !date && !note) return
+
+    let type
+    if (typeRaw === '支出' || typeRaw.toLowerCase() === 'expense') type = 'expense'
+    else if (typeRaw === '收入' || typeRaw.toLowerCase() === 'income') type = 'income'
+    else { errors.push(`第 ${line} 行：类型必须是「支出」或「收入」`); return }
+
+    const amount = Number(amountRaw)
+    if (!Number.isFinite(amount) || amount <= 0) { errors.push(`第 ${line} 行：金额无效，需为正数`); return }
+
+    if (!catIndex[type + '|' + l1]) { errors.push(`第 ${line} 行：一级分类「${l1}」不存在（${type === 'expense' ? '支出' : '收入'}）`); return }
+    if (!subIndex[type + '|' + l1 + '|' + l2]) { errors.push(`第 ${line} 行：二级分类「${l2}」不属于「${l1}」`); return }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { errors.push(`第 ${line} 行：日期格式应为 年-月-日，例如 2026-08-17`); return }
+
+    insRec.run(type, amount, l1, l2, date, note, new Date().toISOString())
+    imported++
+  })
+
+  return { canceled: false, imported, skipped: errors.length, errors: errors.slice(0, 50), totalErrors: errors.length }
+}
+
+function clearData(scope) {
+  if (scope !== 'records') throw new Error('暂不支持该清空范围')
+  const info = db.prepare('DELETE FROM records').run()
+  return { cleared: Number(info.changes) }
+}
+
 function registerIpc() {
   ipcMain.handle('categories:get', () => getCategories())
   ipcMain.handle('categories:add', (e, arg) => addCategory(arg))
@@ -144,6 +260,10 @@ function registerIpc() {
   ipcMain.handle('records:add', (e, payload) => addRecord(payload))
   ipcMain.handle('records:update', (e, arg) => updateRecord(arg))
   ipcMain.handle('records:remove', (e, id) => removeRecord(id))
+  ipcMain.handle('data:exportCsv', () => exportCsv())
+  ipcMain.handle('data:importCsv', () => importCsv())
+  ipcMain.handle('data:clearData', (e, scope) => clearData(scope))
+  ipcMain.handle('data:downloadTemplate', () => downloadTemplate())
 }
 
 function createWindow() {

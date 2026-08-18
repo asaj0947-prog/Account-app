@@ -10,5 +10,9 @@ contextBridge.exposeInMainWorld('api', {
   getRecords: () => ipcRenderer.invoke('records:get'),
   addRecord: (payload) => ipcRenderer.invoke('records:add', payload),
   updateRecord: (id, payload) => ipcRenderer.invoke('records:update', { id, payload }),
-  removeRecord: (id) => ipcRenderer.invoke('records:remove', id)
+  removeRecord: (id) => ipcRenderer.invoke('records:remove', id),
+  exportCsv: () => ipcRenderer.invoke('data:exportCsv'),
+  importCsv: () => ipcRenderer.invoke('data:importCsv'),
+  clearData: (scope) => ipcRenderer.invoke('data:clearData', scope),
+  downloadTemplate: () => ipcRenderer.invoke('data:downloadTemplate')
 })

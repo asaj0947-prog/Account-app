@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, reactive } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { categories, addCategory, addSubcategory, removeCategory, removeSubcategory } from '../store/data'
+import { categories, addCategory, addSubcategory, removeCategory, removeSubcategory, exportCsv, importCsv, clearData, downloadTemplate } from '../store/data'
 
 const activeType = ref('expense')
 const newL1 = ref('')
@@ -60,6 +60,58 @@ async function removeL2(l1Name, name) {
     ElMessage.error((e && e.message) || '删除失败')
   }
 }
+
+async function onExport() {
+  try {
+    const res = await exportCsv()
+    if (res && res.canceled) return
+    ElMessage.success(`已导出 ${res.count} 条账单`)
+  } catch (e) {
+    ElMessage.error((e && e.message) || '导出失败')
+  }
+}
+
+async function onDownloadTemplate() {
+  try {
+    const res = await downloadTemplate()
+    if (res && res.canceled) return
+    ElMessage.success('模板已保存')
+  } catch (e) {
+    ElMessage.error((e && e.message) || '保存模板失败')
+  }
+}
+
+async function onImport() {
+  try {
+    const res = await importCsv()
+    if (res && res.canceled) return
+    if (res.totalErrors > 0) {
+      const detail = res.errors.slice(0, 5).join('\n') + (res.errors.length > 5 ? '\n……' : '')
+      ElMessageBox.alert(`成功导入 ${res.imported} 条，跳过 ${res.skipped} 条。\n\n${detail}`, '导入完成', { type: 'warning' })
+    } else {
+      ElMessage.success(`成功导入 ${res.imported} 条账单`)
+    }
+  } catch (e) {
+    ElMessage.error((e && e.message) || '导入失败')
+  }
+}
+
+function onClear() {
+  ElMessageBox.confirm('确定要清空所有账单吗？分类会保留，此操作无法撤销。', '清空确认', {
+    confirmButtonText: '清空',
+    cancelButtonText: '取消',
+    type: 'warning'
+  })
+    .then(async () => {
+      try {
+        const res = await clearData('records')
+        ElMessage.success(`已清空 ${res.cleared} 条账单`)
+      } catch (e) {
+        ElMessage.error((e && e.message) || '清空失败')
+      }
+    })
+    .catch(() => {})
+}
 </script>
 
 <template>
@@ -110,7 +162,27 @@ async function removeL2(l1Name, name) {
 
     <div class="card" style="margin-top: 16px">
       <div class="block-title">数据管理</div>
-      <div class="sub">数据保存在本机。数据备份、导出 Excel 等功能将在后续版本提供。</div>
+      <div class="sub">数据保存在本机。可以把账单导出成 CSV（Excel、WPS 都能打开），也可以把整理好的 CSV 导入进来。</div>
+
+      <div class="data-btns">
+        <el-button type="primary" @click="onExport">导出 CSV</el-button>
+        <el-button @click="onDownloadTemplate">下载导入模板</el-button>
+        <el-button @click="onImport">导入 CSV</el-button>
+        <el-button type="danger" plain @click="onClear">清空账单</el-button>
+      </div>
+
+      <div class="import-format">
+        <div class="format-title">导入文件的格式（每行一条账单，共 6 列）</div>
+        <div class="format-line">类型 · 金额 · 一级分类 · 二级分类 · 日期 · 备注</div>
+        <ul class="format-list">
+          <li>类型：只能填「支出」或「收入」</li>
+          <li>金额：数字，例如 25.50</li>
+          <li>一级分类、二级分类：必须和软件里已有的分类完全一致</li>
+          <li>日期：年-月-日，例如 2026-08-17</li>
+          <li>备注：可留空</li>
+        </ul>
+        <div class="format-tip">建议先点「下载导入模板」，照着模板填；模板里的两行示例导入前请删掉。</div>
+      </div>
     </div>
   </div>
 </template>
@@ -135,4 +207,16 @@ async function removeL2(l1Name, name) {
 .l1-count { color: var(--text-2); font-size: 12px; }
 .l2-wrap { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .l2-tag { border-radius: 6px; }
+.data-btns { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.import-format {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: var(--bg);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.format-title { font-weight: 600; }
+.format-line { color: var(--text-2); margin: 4px 0 8px; }
+.format-list { margin: 0; padding-left: 18px; color: var(--text-2); line-height: 1.9; }
+.format-tip { margin-top: 8px; color: var(--text-2); }
 </style>
