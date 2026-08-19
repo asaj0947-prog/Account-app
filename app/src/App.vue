@@ -6,6 +6,7 @@ const menu = [
   { path: '/', label: '首页', icon: 'HomeFilled' },
   { path: '/bills', label: '账单', icon: 'Document' },
   { path: '/stats', label: '统计', icon: 'DataAnalysis' },
+  { path: '/snake', label: '贪吃蛇', icon: 'VideoPlay' },
   { path: '/settings', label: '设置', icon: 'Setting' }
 ]
 </script>

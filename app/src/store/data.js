@@ -187,6 +187,22 @@ export async function clearData(scope) {
   return summary
 }
 
+// ---------- 贪吃蛇最高分 ----------
+export async function getHighScore() {
+  if (api) return api.getHighScore()
+  try { return Number(localStorage.getItem('snake_high_score')) || 0 } catch { return 0 }
+}
+
+export async function setHighScore(score) {
+  if (api) return api.setHighScore(score)
+  try {
+    const cur = Number(localStorage.getItem('snake_high_score')) || 0
+    const n = Math.max(0, Math.floor(Number(score) || 0))
+    if (n > cur) localStorage.setItem('snake_high_score', String(n))
+    return Math.max(cur, n)
+  } catch { return score }
+}
+
 // ---------- 记账弹窗状态 ----------
 export const ui = reactive({
   recordDialogVisible: false,

@@ -54,6 +54,10 @@ function initDb() {
       note TEXT DEFAULT '',
       createdAt TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `)
   seedCategories()
 }
@@ -133,6 +137,21 @@ function updateRecord(arg) {
 
 function removeRecord(id) {
   db.prepare('DELETE FROM records WHERE id = ?').run(id)
+}
+
+// ---------- 贪吃蛇最高分 ----------
+function getHighScore() {
+  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get('snake_high_score')
+  return row ? (Number(row.value) || 0) : 0
+}
+
+function setHighScore(score) {
+  const n = Math.max(0, Math.floor(Number(score) || 0))
+  if (n <= getHighScore()) return getHighScore()
+  const exists = db.prepare('SELECT key FROM settings WHERE key = ?').get('snake_high_score')
+  if (exists) db.prepare('UPDATE settings SET value = ? WHERE key = ?').run(String(n), 'snake_high_score')
+  else db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)').run('snake_high_score', String(n))
+  return n
 }
 
 const { toCsv, parseCsv, decodeCsvBuffer, CSV_HEADER } = require('./csv.cjs')
@@ -264,6 +283,8 @@ function registerIpc() {
   ipcMain.handle('data:importCsv', () => importCsv())
   ipcMain.handle('data:clearData', (e, scope) => clearData(scope))
   ipcMain.handle('data:downloadTemplate', () => downloadTemplate())
+  ipcMain.handle('snake:getHighScore', () => getHighScore())
+  ipcMain.handle('snake:setHighScore', (e, score) => setHighScore(score))
 }
 
 function createWindow() {

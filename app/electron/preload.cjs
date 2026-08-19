@@ -14,5 +14,7 @@ contextBridge.exposeInMainWorld('api', {
   exportCsv: () => ipcRenderer.invoke('data:exportCsv'),
   importCsv: () => ipcRenderer.invoke('data:importCsv'),
   clearData: (scope) => ipcRenderer.invoke('data:clearData', scope),
-  downloadTemplate: () => ipcRenderer.invoke('data:downloadTemplate')
+  downloadTemplate: () => ipcRenderer.invoke('data:downloadTemplate'),
+  getHighScore: () => ipcRenderer.invoke('snake:getHighScore'),
+  setHighScore: (score) => ipcRenderer.invoke('snake:setHighScore', score)
 })
