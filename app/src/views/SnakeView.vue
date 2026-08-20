@@ -105,7 +105,7 @@ function tick() {
     if (score.value > highScore.value) {
       highScore.value = score.value
       beatRecord.value = true
-      setHighScore(score.value)
+      setHighScore(score.value).catch(() => {})
     }
     // 占满整张棋盘（理论上的通关），结束游戏避免死循环
     if (snake.length >= GRID * GRID) return gameOver()
@@ -193,7 +193,11 @@ function onKeydown(e) {
 
 onMounted(async () => {
   ctx = canvasRef.value.getContext('2d')
-  highScore.value = await getHighScore()
+  try {
+    highScore.value = await getHighScore()
+  } catch {
+    highScore.value = 0
+  }
   reset()
   draw()
   window.addEventListener('keydown', onKeydown)
